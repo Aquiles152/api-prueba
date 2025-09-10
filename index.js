@@ -27,8 +27,11 @@ app.get("/", (req, res) => {
 });
 
 app.get("/books", (req, res) => {
-  const data = readData();
-  res.json(data.books);
+  res.json({
+    "prueba": 12
+  })
+  // const data = readData();
+  // res.json(data.books);
 });
 
 app.get("/books/:id", (req, res) => {
