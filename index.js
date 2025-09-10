@@ -1,9 +1,13 @@
 import express from "express";
 import fs from "fs";
 import bodyParser from "body-parser";
+import connect from './dbConnection.mjs';
+
 
 const app = express();
 app.use(bodyParser.json());
+const db = await connect();
+
 
 const readData = () => {
   try {
@@ -26,12 +30,14 @@ app.get("/", (req, res) => {
   res.send("Welcome to my first API with Node js!");
 });
 
-app.get("/books", (req, res) => {
-  res.json({
-    "prueba": 12
-  })
-  // const data = readData();
-  // res.json(data.books);
+app.get("/books", async (req, res) => {
+  try {
+    const [rows, fields] = await db.execute("SELECT * FROM libro");
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener los libros" });
+  }
 });
 
 app.get("/books/:id", (req, res) => {
