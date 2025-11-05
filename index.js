@@ -125,7 +125,7 @@ async function refrescarJugadores(contadoListaRefrescar) {
         try {
           const cantidadPartidas = perfil.wins + perfil.losses;
 
-          if (cantidadPartidas >= 0) {
+          if (cantidadPartidas >= cantidadMinimaPartidas) {
             const partidasJugador = await getPartidasJugador(perfil.puuid, cantidadPartidasMiradas);
 
             if (partidasJugador && partidasJugador.length >= cantidadPartidasMiradas) {
@@ -137,7 +137,7 @@ async function refrescarJugadores(contadoListaRefrescar) {
                   cantidadMinimaDias
                 );
 
-                if (dentroRango || true) {
+                if (dentroRango) {
                   const datosJugador = await getDatosJugador(perfil.puuid);
 
                   if (datosJugador) {
@@ -254,16 +254,16 @@ app.get("/perfiles", async (req, res) => {
 
 app.listen(3001, async () => {
   console.log("Server listening on port 3000");
-  for (let index = 0; index < divisiones.length; index= index +4) {
-    refrescarJugadores(index)
-    refrescarJugadores(index + 1)
-    refrescarJugadores(index + 2)
-    await refrescarJugadores(index + 3)
-  }
-
-  // for (let index = 0; index < divisiones.length; index++) {
+  // for (let index = 0; index < divisiones.length; index= index +4) {
   //   refrescarJugadores(index)
+  //   refrescarJugadores(index + 1)
+  //   refrescarJugadores(index + 2)
+  //   await refrescarJugadores(index + 3)
   // }
+
+  for (let index = 0; index < divisiones.length; index++) {
+    await refrescarJugadores(index)
+  }
 });
 
 
