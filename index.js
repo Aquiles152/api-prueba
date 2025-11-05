@@ -36,7 +36,7 @@ app.get("/", (req, res) => {
 
 app.get("/perfiles", async (req, res) => {
   try {
-    res.json(users);
+    res.json({cantidadUsuarios: users.length});
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error al obtener los perfiles" });
