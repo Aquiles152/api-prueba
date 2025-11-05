@@ -1,7 +1,5 @@
 import express from "express";
-import fs from "fs";
 import bodyParser from "body-parser";
-import connect from './dbConnection.mjs';
 
 let api = 'RGAPI-5511e4bb-2454-4751-b434-d26a521ea2f2';
 let users = [];
@@ -10,9 +8,20 @@ const sleep = (ms) => {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const getListadoPorRango = (rango, minirango, page) => {
-    return this.http.get('https://euw1.api.riotgames.com/lol/league-exp/v4/entries/RANKED_SOLO_5x5/' + rango + '/' + minirango + '?page='+ page +'&api_key=' +  this.api())
-};
+async function getListadoPorRango(rango, minirango, page) {
+  const url = `https://euw1.api.riotgames.com/lol/league-exp/v4/entries/RANKED_SOLO_5x5/${rango}/${minirango}?page=${page}&api_key=${api}`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+    const data = await response.json();
+    return data; // ✅ devuelve los datos correctamente
+  } catch (error) {
+    console.error('❌ Error obteniendo datos de Riot API:', error);
+    return []; // devuelve array vacío para no romper el flujo
+  }
+}
 
 const app = express();
 app.use(bodyParser.json());
@@ -72,7 +81,7 @@ app.get("/perfiles", async (req, res) => {
 //   res.json({ message: "Book deleted successfully" });
 // });
 
-app.listen(3000, async () => {
+app.listen(3001, async () => {
   console.log("Server listening on port 3000");
   for (let index = 1; index <= 680; index++) {
     await sleep(2000);
