@@ -6,41 +6,67 @@ import cors from "cors";
 let api = 'RGAPI-5511e4bb-2454-4751-b434-d26a521ea2f2';
 let users = [];
 
+let divisionesPublicas = [
+  ['IRON', 'IV', []],
+  ['IRON', 'III', []],
+  ['IRON', 'II', []],
+  ['IRON', 'I', []],
+  ['BRONZE', 'IV', []],
+  ['BRONZE', 'III', []],
+  ['BRONZE', 'II', []],
+  ['BRONZE', 'I', []],
+  ['SILVER', 'IV', []],
+  ['SILVER', 'III', []],
+  ['SILVER', 'II', []],
+  ['SILVER', 'I', []],
+  ['GOLD', 'IV', []],
+  ['GOLD', 'III', []],
+  ['GOLD', 'II', []],
+  ['GOLD', 'I', []],
+  ['PLATINUM', 'IV', []],
+  ['PLATINUM', 'III', []],
+  ['PLATINUM', 'II', []],
+  ['PLATINUM', 'I', []],
+  ['EMERALD', 'IV', []],
+  ['EMERALD', 'III', []],
+  ['EMERALD', 'II', []],
+  ['EMERALD', 'I', []],
+  ['DIAMOND', 'IV', []],
+  ['DIAMOND', 'III', []],
+  ['DIAMOND', 'II', []],
+  ['DIAMOND', 'I', []],
+];
+
+
 const divisiones = [
-  ['IRON', 'IV'],
-  ['IRON', 'III'],
-  ['IRON', 'II'],
-  ['IRON', 'I'],
-
-  ['BRONZE', 'IV'],
-  ['BRONZE', 'III'],
-  ['BRONZE', 'II'],
-  ['BRONZE', 'I'],
-
-  ['SILVER', 'IV'],
-  ['SILVER', 'III'],
-  ['SILVER', 'II'],
-  ['SILVER', 'I'],
-
-  ['GOLD', 'IV'],
-  ['GOLD', 'III'],
-  ['GOLD', 'II'],
-  ['GOLD', 'I'],
-
-  ['PLATINUM', 'IV'],
-  ['PLATINUM', 'III'],
-  ['PLATINUM', 'II'],
-  ['PLATINUM', 'I'],
-
-  ['EMERALD', 'IV'],
-  ['EMERALD', 'III'],
-  ['EMERALD', 'II'],
-  ['EMERALD', 'I'],
-
-  ['DIAMOND', 'IV'],
-  ['DIAMOND', 'III'],
-  ['DIAMOND', 'II'],
-  ['DIAMOND', 'I'],
+  ['IRON', 'IV', []],
+  ['IRON', 'III', []],
+  ['IRON', 'II', []],
+  ['IRON', 'I', []],
+  ['BRONZE', 'IV', []],
+  ['BRONZE', 'III', []],
+  ['BRONZE', 'II', []],
+  ['BRONZE', 'I', []],
+  ['SILVER', 'IV', []],
+  ['SILVER', 'III', []],
+  ['SILVER', 'II', []],
+  ['SILVER', 'I', []],
+  ['GOLD', 'IV', []],
+  ['GOLD', 'III', []],
+  ['GOLD', 'II', []],
+  ['GOLD', 'I', []],
+  ['PLATINUM', 'IV', []],
+  ['PLATINUM', 'III', []],
+  ['PLATINUM', 'II', []],
+  ['PLATINUM', 'I', []],
+  ['EMERALD', 'IV', []],
+  ['EMERALD', 'III', []],
+  ['EMERALD', 'II', []],
+  ['EMERALD', 'I', []],
+  ['DIAMOND', 'IV', []],
+  ['DIAMOND', 'III', []],
+  ['DIAMOND', 'II', []],
+  ['DIAMOND', 'I', []],
 ];
 
 const sleep = (ms) => {
@@ -76,51 +102,80 @@ const comprobarFechaPartidaValidaEnRango = (fechaPartidaNum, dias) => {
   return diferenciaTiempo <= MILISEGUNDOS_EN_UN_DIA;
 }
 
+// FILTROS
+const cantidadMinimaPartidas = 100;
+const cantidadPartidasMiradas = 3;
+const cantidadMinimaDias = 7; //SE PERMITE HOY + 1 DIA
+
 async function refrescarJugadores(contadoListaRefrescar) {
-let terminado = false;
-let contador = 1;
-  while(!terminado) {
-    let perfiles = await getListadoPorRango(divisiones[contadoListaRefrescar][0], divisiones[contadoListaRefrescar][1], contador++)
-    if (perfiles && perfiles?.length) {
-      console.log(divisiones[contadoListaRefrescar][0], divisiones[contadoListaRefrescar][1], contador, perfiles[0].puuid)
-      perfiles.forEach(async (perfil) => {
-        let cantidadPartidas = perfil.wins + perfil.losses;
-        if (cantidadPartidas >= 100) {
-          let partidasJugador = await getPartidasJugador(perfil.puuid, cantidadPartidasMiradas)
-          if (partidasJugador && partidasJugador.length >= cantidadPartidasMiradas) {
-            let primeraPartida = await getDatosPartida(partidasJugador[0])
+  let terminado = false;
+  let contador = 1;
 
-            if (primeraPartida && primeraPartida.info) {
-              if (comprobarFechaPartidaValidaEnRango(primeraPartida.info.gameStartTimestamp, cantidadMinimaDias)) {
-                let datosJugador = await getDatosJugador(perfil.puuid);
-                if (datosJugador) {
-                  let wr = (cantidadPartidas > 0 ? (perfil.wins / cantidadPartidas) * 100 : 0)
-                  users.push({
-                    nick: datosJugador.gameName + '#' + datosJugador.tagLine,
-                    fechaUltimaPartida: primeraPartida.info.gameEndTimestamp,
-                    fechaUltimaPartidaString: convertirMilisegundosAFecha(primeraPartida.info.gameStartTimestamp),
-                    tier: perfil.tier,
-                    rank: perfil.rank,
-                    cantidadPartidas: cantidadPartidas,
-                    wins: perfil.wins,
-                    losses: perfil.losses,
-                    wr: parseFloat(wr.toFixed(2))
-                  })
+  while (!terminado) {
+    const tier = divisiones[contadoListaRefrescar][0];
+    const rank = divisiones[contadoListaRefrescar][1];
 
+    const perfiles = await getListadoPorRango(tier, rank, contador++);
+
+    if (perfiles && perfiles.length) {
+      console.log(tier, rank, contador, divisiones[contadoListaRefrescar][2].length);
+
+      // 👇 Usamos for...of en lugar de forEach para que los awaits funcionen bien
+      for (const perfil of perfiles) {
+        try {
+          const cantidadPartidas = perfil.wins + perfil.losses;
+
+          if (cantidadPartidas >= 0) {
+            const partidasJugador = await getPartidasJugador(perfil.puuid, cantidadPartidasMiradas);
+
+            if (partidasJugador && partidasJugador.length >= cantidadPartidasMiradas) {
+              const primeraPartida = await getDatosPartida(partidasJugador[0]);
+
+              if (primeraPartida?.info) {
+                const dentroRango = comprobarFechaPartidaValidaEnRango(
+                  primeraPartida.info.gameStartTimestamp,
+                  cantidadMinimaDias
+                );
+
+                if (dentroRango || true) {
+                  const datosJugador = await getDatosJugador(perfil.puuid);
+
+                  if (datosJugador) {
+                    const wr = cantidadPartidas > 0 ? (perfil.wins / cantidadPartidas) * 100 : 0;
+                    divisiones[contadoListaRefrescar][2].push({
+                      nick: `${datosJugador.gameName}#${datosJugador.tagLine}`,
+                      fechaUltimaPartida: primeraPartida.info.gameEndTimestamp,
+                      fechaUltimaPartidaString: convertirMilisegundosAFecha(
+                        primeraPartida.info.gameStartTimestamp
+                      ),
+                      tier: perfil.tier,
+                      rank: perfil.rank,
+                      cantidadPartidas,
+                      wins: perfil.wins,
+                      losses: perfil.losses,
+                      wr: parseFloat(wr.toFixed(2))
+                    });
+                  }
                 }
               }
             }
           }
+        } catch (error) {
+          console.error(`❌ Error procesando perfil ${perfil.puuid}:`, error);
         }
-      });
+      }
     } else {
+      // No hay más páginas → pasamos al siguiente rango
+      // if (contadoListaRefrescar + 1 < divisiones.length) {
+      //   console.log(`➡️ Pasando a ${divisiones[contadoListaRefrescar + 1][0]} ${divisiones[contadoListaRefrescar + 1][1]}`);
+      //   await refrescarJugadores(contadoListaRefrescar + 1);
+      // } else {
+      //   console.log("✅ Todos los rangos completados");
+      // }
+
       terminado = true;
-      console.log(divisiones.length, contadoListaRefrescar)
-      if ((divisiones.length -1) > contadoListaRefrescar){
-        await refrescarJugadores(contadoListaRefrescar + 1)
-      } 
     }
-  } 
+  }
 }
 
 
@@ -195,14 +250,20 @@ app.get("/perfiles", async (req, res) => {
 });
 
 
-// FILTROS
-const cantidadMinimaPartidas = 100;
-const cantidadPartidasMiradas = 3;
-const cantidadMinimaDias = 7; //SE PERMITE HOY + 1 DIA
+
 
 app.listen(3001, async () => {
   console.log("Server listening on port 3000");
-  await refrescarJugadores(0)
+  for (let index = 0; index < divisiones.length; index= index +4) {
+    refrescarJugadores(index)
+    refrescarJugadores(index + 1)
+    refrescarJugadores(index + 2)
+    await refrescarJugadores(index + 3)
+  }
+
+  // for (let index = 0; index < divisiones.length; index++) {
+  //   refrescarJugadores(index)
+  // }
 });
 
 
