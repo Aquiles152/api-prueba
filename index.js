@@ -235,14 +235,16 @@ app.listen(3001, async () => {
   //   refrescarJugadores(index + 2)
   //   await refrescarJugadores(index + 3)
   // }
-  while (true) {
-    resetearDivisiones()
-    console.log("reseteado", divisiones.length)
-    for (let index = 0; index < divisiones.length; index++) {
-      await refrescarJugadores(index)
-    }
-    divisionesPublicas = divisiones
-  }
+
+  
+  // while (true) {
+  //   resetearDivisiones()
+  //   console.log("reseteado", divisiones.length)
+  //   for (let index = 0; index < divisiones.length; index++) {
+  //     await refrescarJugadores(index)
+  //   }
+  //   divisionesPublicas = divisiones
+  // }
 });
 
 
