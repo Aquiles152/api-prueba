@@ -227,7 +227,7 @@ app.get("/perfiles", async (req, res) => {
 
 
 
-app.listen(3001, async () => {
+app.listen(3000, async () => {
   console.log("Server listening on port 3000");
   // for (let index = 0; index < divisiones.length; index= index +4) {
   //   refrescarJugadores(index)
@@ -236,15 +236,15 @@ app.listen(3001, async () => {
   //   await refrescarJugadores(index + 3)
   // }
 
-  
-  // while (true) {
-  //   resetearDivisiones()
-  //   console.log("reseteado", divisiones.length)
-  //   for (let index = 0; index < divisiones.length; index++) {
-  //     await refrescarJugadores(index)
-  //   }
-  //   divisionesPublicas = divisiones
-  // }
+
+  while (true) {
+    resetearDivisiones()
+    console.log("reseteado", divisiones.length)
+    for (let index = 0; index < divisiones.length; index++) {
+      await refrescarJugadores(index)
+    }
+    divisionesPublicas = divisiones
+  }
 });
 
 
