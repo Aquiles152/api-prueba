@@ -6,7 +6,13 @@ import cors from "cors";
 let api = 'RGAPI-5511e4bb-2454-4751-b434-d26a521ea2f2';
 let users = [];
 
-let divisionesPublicas = [
+let divisionesPublicas = null;
+
+
+let divisiones = [];
+
+const resetearDivisiones = () => {
+  divisiones = [
   ['IRON', 'IV', []],
   ['IRON', 'III', []],
   ['IRON', 'II', []],
@@ -15,7 +21,7 @@ let divisionesPublicas = [
   ['BRONZE', 'III', []],
   ['BRONZE', 'II', []],
   ['BRONZE', 'I', []],
-  ['SILVER', 'IV', []],
+  ['SILVER', 'IV', []], 
   ['SILVER', 'III', []],
   ['SILVER', 'II', []],
   ['SILVER', 'I', []],
@@ -35,58 +41,27 @@ let divisionesPublicas = [
   ['DIAMOND', 'III', []],
   ['DIAMOND', 'II', []],
   ['DIAMOND', 'I', []],
-];
-
-
-const divisiones = [
-  ['IRON', 'IV', []],
-  ['IRON', 'III', []],
-  ['IRON', 'II', []],
-  ['IRON', 'I', []],
-  ['BRONZE', 'IV', []],
-  ['BRONZE', 'III', []],
-  ['BRONZE', 'II', []],
-  ['BRONZE', 'I', []],
-  ['SILVER', 'IV', []],
-  ['SILVER', 'III', []],
-  ['SILVER', 'II', []],
-  ['SILVER', 'I', []],
-  ['GOLD', 'IV', []],
-  ['GOLD', 'III', []],
-  ['GOLD', 'II', []],
-  ['GOLD', 'I', []],
-  ['PLATINUM', 'IV', []],
-  ['PLATINUM', 'III', []],
-  ['PLATINUM', 'II', []],
-  ['PLATINUM', 'I', []],
-  ['EMERALD', 'IV', []],
-  ['EMERALD', 'III', []],
-  ['EMERALD', 'II', []],
-  ['EMERALD', 'I', []],
-  ['DIAMOND', 'IV', []],
-  ['DIAMOND', 'III', []],
-  ['DIAMOND', 'II', []],
-  ['DIAMOND', 'I', []],
-];
+  ]
+}
 
 const sleep = (ms) => {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-  const convertirMilisegundosAFecha = (milisegundos) => {
-    // Crear un objeto Date con los milisegundos
-    const fecha = new Date(milisegundos);
+const convertirMilisegundosAFecha = (milisegundos) => {
+  // Crear un objeto Date con los milisegundos
+  const fecha = new Date(milisegundos);
 
-    // Formatear la fecha
-    const dia = fecha.getDate().toString().padStart(2, '0');
-    const mes = (fecha.getMonth() + 1).toString().padStart(2, '0');
-    const anio = fecha.getFullYear();
-    const horas = fecha.getHours().toString().padStart(2, '0');
-    const minutos = fecha.getMinutes().toString().padStart(2, '0');
-    const segundos = fecha.getSeconds().toString().padStart(2, '0');
+  // Formatear la fecha
+  const dia = fecha.getDate().toString().padStart(2, '0');
+  const mes = (fecha.getMonth() + 1).toString().padStart(2, '0');
+  const anio = fecha.getFullYear();
+  const horas = fecha.getHours().toString().padStart(2, '0');
+  const minutos = fecha.getMinutes().toString().padStart(2, '0');
+  const segundos = fecha.getSeconds().toString().padStart(2, '0');
 
-    return `${dia}/${mes}/${anio} ${horas}:${minutos}`;
-  }
+  return `${dia}/${mes}/${anio} ${horas}:${minutos}`;
+}
 
 const comprobarFechaPartidaValidaEnRango = (fechaPartidaNum, dias) => {
   const fechaActual = new Date();
@@ -111,7 +86,7 @@ async function refrescarJugadores(contadoListaRefrescar) {
   let terminado = false;
   let contador = 1;
 
-  while (!terminado) {
+  while (!terminado && contador < 3) {
     const tier = divisiones[contadoListaRefrescar][0];
     const rank = divisiones[contadoListaRefrescar][1];
 
@@ -187,7 +162,7 @@ async function getDatosJugador(puuid) {
     const data = await response.json();
     return data;
   } catch (error) {
-    return []; 
+    return [];
   }
 }
 
@@ -199,7 +174,7 @@ async function getListadoPorRango(rango, minirango, page) {
     const data = await response.json();
     return data;
   } catch (error) {
-    return []; 
+    return [];
   }
 }
 
@@ -211,7 +186,7 @@ async function getPartidasJugador(puuid, cantidadPartidasMiradas) {
     const data = await response.json();
     return data;
   } catch (error) {
-    return []; 
+    return [];
   }
 }
 
@@ -224,7 +199,7 @@ async function getDatosPartida(idPartida) {
     const data = await response.json();
     return data;
   } catch (error) {
-    return []; 
+    return [];
   }
 }
 
@@ -242,7 +217,7 @@ app.get("/", (req, res) => {
 
 app.get("/perfiles", async (req, res) => {
   try {
-    res.json({cantidadUsuarios: users.length});
+    res.json({ divisionesPublicas: divisionesPublicas, divisiones: divisiones });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error al obtener los perfiles" });
@@ -260,9 +235,13 @@ app.listen(3001, async () => {
   //   refrescarJugadores(index + 2)
   //   await refrescarJugadores(index + 3)
   // }
-
-  for (let index = 0; index < divisiones.length; index++) {
-    await refrescarJugadores(index)
+  while (true) {
+    resetearDivisiones()
+    console.log("reseteado", divisiones.length)
+    for (let index = 0; index < divisiones.length; index++) {
+      await refrescarJugadores(index)
+    }
+    divisionesPublicas = divisiones
   }
 });
 
