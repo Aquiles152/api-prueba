@@ -86,7 +86,7 @@ async function refrescarJugadores(contadoListaRefrescar) {
   let terminado = false;
   let contador = 1;
 
-  while (!terminado && contador < 3) {
+  while (!terminado && contador < 50) {
     const tier = divisiones[contadoListaRefrescar][0];
     const rank = divisiones[contadoListaRefrescar][1];
 
