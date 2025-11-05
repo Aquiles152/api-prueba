@@ -1,5 +1,7 @@
 import express from "express";
 import bodyParser from "body-parser";
+import cors from "cors";
+
 
 let api = 'RGAPI-5511e4bb-2454-4751-b434-d26a521ea2f2';
 let users = [];
@@ -25,6 +27,7 @@ async function getListadoPorRango(rango, minirango, page) {
 
 const app = express();
 app.use(bodyParser.json());
+app.use(cors());
 
 app.get("/", (req, res) => {
   res.send("Welcome to my first API with Node js!");
