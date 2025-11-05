@@ -6,7 +6,7 @@ import connect from './dbConnection.mjs';
 let api = 'RGAPI-5511e4bb-2454-4751-b434-d26a521ea2f2';
 let users = [];
 
-export function sleep(ms) {
+const sleep = (ms) => {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
