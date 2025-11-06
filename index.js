@@ -190,12 +190,15 @@ async function refrescarJugadores() {
   let perfiles = await obtenerPerfilesDeTodasLasDivisiones()
 
   perfiles.forEach(perfil => {
+    if (perfil && perfil.puuid) {
     const index = users.findIndex(u => u.puuid === perfil.puuid);
     if (index !== -1) {
       users[index] = perfil;
     } else {
       users.push(perfil);
     }
+    }
+
   })
  
  
