@@ -180,6 +180,8 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
           jugador.date = res5.info.gameCreation;
           jugador.line = participante2.individualPosition
           jugador.champ = participante2.championName;
+          jugador.champId = participante2.championId;
+          jugador.kda = participante2.kills + '/' + participante2.deaths + '/' + participante2.assists + ' ' + participante2.championName
           if (dataSoloQ) {
             jugador.lps = dataSoloQ?.leaguePoints
             jugador.tierSQ = dataSoloQ.tier
@@ -409,7 +411,7 @@ app.get("/perfilesFiltrados", (req, res) => {
       lpsLower, lpsUpper,
       posicion,
       diasMaximoBusqueda,
-      cantidadMaximaResultados
+      cantidadMaximaResultados, campeonId
     } = req.query;
 
     console.log(req.query)
@@ -435,6 +437,7 @@ app.get("/perfilesFiltrados", (req, res) => {
         && lps >= parseInt(lpsLower) && lps <= parseInt(lpsUpper)
         && (!posicion || j.line?.toUpperCase() === posicion.toUpperCase())
         && (!j.date || fechaPartida >= fechaMinima)
+        && (!j.championId || j.champId === campeonId)
       );
     });
 
