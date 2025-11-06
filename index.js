@@ -181,7 +181,7 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
           jugador.line = participante2.individualPosition
           jugador.champ = participante2.championName;
           jugador.champId = participante2.championId;
-          jugador.kda = participante2.kills + '/' + participante2.deaths + '/' + participante2.assists + ' ' + participante2.championName
+          jugador.kda = participante2.kills + '/' + participante2.deaths + '/' + participante2.assists
           if (dataSoloQ) {
             jugador.lps = dataSoloQ?.leaguePoints
             jugador.tierSQ = dataSoloQ.tier
@@ -205,7 +205,6 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
             }
           }
           let puntajeMedio = rangoMedio
-          console.log
           let puntosRanked = calcularPuntosRanked(jugador.tierSQ, jugador.rankSQ);
           if (
             (!siguienteJugador.puuid ||
@@ -413,9 +412,7 @@ app.get("/perfilesFiltrados", (req, res) => {
       diasMaximoBusqueda,
       cantidadMaximaResultados, campeonId
     } = req.query;
-
-    console.log(req.query)
-
+    
     // Calcular fecha mínima (días hacia atrás)
     const diasMilis = parseInt(diasMaximoBusqueda) * 24 * 60 * 60 * 1000;
     const fechaMinima = Date.now() - diasMilis;
@@ -437,11 +434,9 @@ app.get("/perfilesFiltrados", (req, res) => {
         && lps >= parseInt(lpsLower) && lps <= parseInt(lpsUpper)
         && (!posicion || j.line?.toUpperCase() === posicion.toUpperCase())
         && (!j.date || fechaPartida >= fechaMinima)
-        && (!j.championId || j.champId === campeonId)
+        && (!campeonId || parseInt(campeonId) === 0 || j.champId === parseInt(campeonId))
       );
     });
-
-    console.log(filtrados.length)
 
     // Mezclar resultados aleatoriamente y limitar cantidad
     filtrados = filtrados
