@@ -4,10 +4,11 @@ import cors from "cors";
 
 
 let api = 'RGAPI-5511e4bb-2454-4751-b434-d26a521ea2f2';
-let users = [];
-
-let divisionesPublicas = null;
-
+let usuariosGlobales = [];
+let listaPartidasGlobal = [];
+let jugadorEnMira = { nombre: '', puuid: '', dano: 999999, tiempo: 0 }
+let rangoUltimoJugador = '?'
+let listaJugadores = [];
 
 let divisiones = [
   ['IRON', 'IV', 1],
@@ -74,234 +75,268 @@ const comprobarFechaPartidaValidaEnRango = (fechaPartidaNum, dias) => {
   return diferenciaTiempo <= MILISEGUNDOS_EN_UN_DIA;
 }
 
+function jugadorExisteEnLista(jugadorSiguiente) {
+  return listaJugadores.some((jugador) => jugador === jugadorSiguiente.puuid);
+}
+
+function escogerPartida(listaPartidas) {
+  let siguientePartida = '';
+
+  for (let index = 0; index < listaPartidas.length; index++) {
+    const partidaActual = listaPartidas[index];
+
+    // ⚙️ Si la partida NO está en la lista global → la usamos
+    if (!listaPartidasGlobal.includes(partidaActual)) {
+      listaPartidasGlobal.push(partidaActual);
+      siguientePartida = partidaActual;
+      break; // salimos del bucle
+    }
+  }
+
+  // Si todas las partidas ya estaban en la lista global, devolvemos la primera como fallback
+  return siguientePartida || listaPartidas[0];
+}
+
+function calcularPuntosRanked(ranked) {
+  let puntos = 0;
+  if (ranked) {
+    switch (ranked.tier) {
+      case 'IRON': puntos += 1; break;
+      case 'BRONZE': puntos += 5; break;
+      case 'SILVER': puntos += 9; break;
+      case 'GOLD': puntos += 13; break;
+      case 'PLATINUM': puntos += 17; break;
+      case 'EMERALD': puntos += 21; break;
+      case 'DIAMOND': puntos += 25; break;
+      case 'MASTER': puntos += 29; break;
+    }
+    switch (ranked.rank) {
+      case 'IV': puntos += 0; break;
+      case 'III': puntos += 1; break;
+      case 'II': puntos += 2; break;
+      case 'I': puntos += 3; break;
+    }
+  }
+  return puntos;
+}
+
+function traductorLinea(linea) {
+  switch (linea) {
+    case 'TOP': return 'TOP';
+    case 'JUNGLE': return 'JUNGLA';
+    case 'MIDDLE': return 'MID';
+    case 'BOTTOM': return 'ADC';
+    case 'UTILITY': return 'SUPPORT';
+  }
+  return linea;
+
+}
+
+function traductorTierRanked(tier) {
+  switch (tier) {
+    case 'IV': return '4';
+    case 'III': return '3';
+    case 'II': return '2';
+    case 'I': return '1';
+  }
+  return tier;
+
+}
+
 
 
 // FILTROS
-const cantidadMinimaPartidas = 100;
+const cantidadMinimaPartidas = 50;
 const cantidadPartidasMiradas = 3;
 const cantidadMinimaDias = 7; //SE PERMITE HOY + 1 DIA
 
 
 // 🔹 Ejecución tipo "forkJoin" con control de page
-async function obtenerPerfilesDeTodasLasDivisiones() {
-  const promesas = divisiones.map(async (division) => {
-    const [tier, rank, page] = division;
+async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
+  console.log("CANTIDAD TOTAL JUGADORES: ", usuariosGlobales.length)
+  let siguienteJugador = { nombre: '', puuid: '', dano: 999999, tiempo: 0, puntosRanked: 999 }
+  listaJugadores.push(puuid)
+  let res4 = await getPartidasJugador(puuid)
+  if (res4) {
+    let res5 = await getDatosPartida(escogerPartida(res4))
+    if (res5) {
+      for (const participante2 of res5.info.participants) {
+        await sleep(200)
+        const ranked = await getDatosRankedJugadorPorPuuid(participante2.puuid);
+        if (ranked) {
+          let rankedT = ranked.filter((ranked) => ranked.queueType === 'RANKED_SOLO_5x5')
+          let puntosRanked = calcularPuntosRanked(rankedT.length ? rankedT[0] : null);
+          let tiempo = participante2.timePlayed;
+          let dano = (participante2.totalDamageDealtToChampions + participante2.totalHealsOnTeammates + participante2.totalDamageShieldedOnTeammates);
+          let mediaDano = (dano / tiempo);
+          let jugador = { nombre: participante2.riotIdGameName + '#' + participante2.riotIdTagline, puuid: participante2.puuid, dano: mediaDano, tiempo, puntosRanked }
+          let flex = ranked.filter((ranked) => ranked?.queueType === 'RANKED_FLEX_SR')
+          let rankedD = ranked.filter((ranked) => ranked?.queueType === 'RANKED_SOLO_5x5')
+          jugador.tier = rankedSo
+          jugador.rankedSoloQ = rankedD.length ? rankedD[0] : null;
+          jugador.rankedFlex = flex.length ? flex[0] : null;
+          jugador.fechaPartida = convertirMilisegundosAFecha(res5.info.gameCreation);
+          jugador.fechaPartidaNumero = res5.info.gameCreation;
+          jugador.lps = jugador.rankedSoloQ?.leaguePoints
+          jugador.agregado = false;
+          jugador.linea = participante2.individualPosition
+          jugador.lineaString = traductorLinea(participante2.individualPosition);
+          jugador.campeon = participante2.championName;
+          if (jugador.rankedSoloQ?.tier) {
+            jugador.rankedSoloQ.tier = jugador.rankedSoloQ.tier;
+          }
 
-    try {
-      const perfiles = await getListadoPorRango(tier, rank, page);
-      if (perfiles && perfiles.length > 0) {
-        division[2] = page + 1;
+          if (jugador?.rankedSoloQ) {
+            jugador.winrate = (jugador.rankedSoloQ.wins / (jugador.rankedSoloQ.wins + jugador.rankedSoloQ.losses)) * 100;
+            jugador.cantidadPartidasJugadas = jugador.rankedSoloQ.wins + jugador.rankedSoloQ.losses;
+            jugador.rango = calcularPuntosRanked(jugador.rankedSoloQ);
+          }
+          if (jugador.rankedFlex?.tier) {
+            jugador.rankedFlex.tier = traductorTierRanked(jugador.rankedFlex.tier);
+          }
+          const index = usuariosGlobales.findIndex(u => u.puuid === jugador.puuid);
+          if (index !== -1) {
+            usuariosGlobales[index] = jugador;
+          } else {
+            usuariosGlobales.push(jugador);
+          }
 
-        let usuarios = []
-
-        for (const perfil of perfiles) {
-          try {
-            const cantidadPartidas = perfil.wins + perfil.losses;
-
-            if (cantidadPartidas >= cantidadMinimaPartidas) {
-              const partidasJugador = await getPartidasJugador(perfil.puuid, cantidadPartidasMiradas);
-
-              if (partidasJugador && partidasJugador.length >= cantidadPartidasMiradas) {
-                const primeraPartida = await getDatosPartida(partidasJugador[0]);
-
-                if (primeraPartida?.info) {
-                  const dentroRango = comprobarFechaPartidaValidaEnRango(
-                    primeraPartida.info.gameStartTimestamp,
-                    cantidadMinimaDias
-                  );
-
-                  if (dentroRango) {
-                    const datosJugador = await getDatosJugador(perfil.puuid);
-                    if (datosJugador) {
-                      const wr = cantidadPartidas > 0 ? (perfil.wins / cantidadPartidas) * 100 : 0;
-                      const nuevoUsuario = {
-                        puuid: perfil.puuid,
-                        nick: `${datosJugador.gameName}#${datosJugador.tagLine}`,
-                        fechaUltimaPartida: primeraPartida.info.gameEndTimestamp,
-                        fechaUltimaPartidaString: convertirMilisegundosAFecha(primeraPartida.info.gameStartTimestamp),
-                        tier: perfil.tier,
-                        rank: perfil.rank,
-                        cantidadPartidas,
-                        wins: perfil.wins,
-                        losses: perfil.losses,
-                        wr: parseFloat(wr.toFixed(2))
-                      };
-                      usuarios.push(nuevoUsuario)
-
-                    }
-                  }
-                }
-              }
-            }
-          } catch (error) {
-            console.error(`❌ Error procesando perfil ${perfil.puuid}:`, error);
+          let puntajeMedio = rangoMedio
+          if (
+            (!siguienteJugador ||                                     // Si no hay jugador elegido aún
+              Math.abs(puntosRanked - puntajeMedio) <
+              Math.abs(siguienteJugador.puntosRanked - puntajeMedio)) &&
+            !jugadorExisteEnLista(participante2) &&                   // Evita repetidos
+            puntosRanked > 0                                          // Ignora jugadores sin rango válido
+          ) {
+            siguienteJugador = {
+              nombre: `${participante2.riotIdGameName}#${participante2.riotIdTagline}`,
+              puuid: participante2.puuid,
+              dano: mediaDano,
+              tiempo,
+              puntosRanked
+            };
           }
         }
-        return usuarios
-
-
-
-
-
-
-
-
-
-
-
+      }
+      if (siguienteJugador.puuid !== '') {
+        jugadorEnMira = siguienteJugador;
+        rangoUltimoJugador = siguienteJugador.puntosRanked + '';
+        buscarJugadores(siguienteJugador.puuid, rangoMedio, puuidSemilla);
 
       } else {
-        division[2] = 1;
+        console.log('No se ha encontrado un nuevo siguiente Jugador, se vuelve a buscar', puuid)
+        buscarJugadores(puuid, rangoMedio, puuidSemilla);
       }
-
-    } catch (err) {
-      console.error(`❌ Error en ${tier} ${rank} página ${page}:`, err.message);
-      // reiniciamos para que vuelva a intentar desde la primera
-      division[2] = 1;
-      return [];
-    }
-  });
-
-  const resultados = await Promise.all(promesas);
-  const todosLosPerfiles = resultados.flat();
-
-  console.log(`✅ Obtenidos ${todosLosPerfiles.length} perfiles`);
-  return todosLosPerfiles;
-}
-
-
-
-
-
-
-
-
-
-
-async function refrescarJugadores() {
-
-
-  // const tier = divisiones[contadoListaRefrescar][0];
-  // const rank = divisiones[contadoListaRefrescar][1];
-
-  // console.log(tier, rank, divisiones[contadoListaRefrescar][2], users.length);
-  // const perfiles = await getListadoPorRango(tier, rank, divisiones[contadoListaRefrescar][2]++);
-
-  let perfiles = await obtenerPerfilesDeTodasLasDivisiones()
-
-  perfiles.forEach(perfil => {
-    if (perfil && perfil.puuid) {
-    const index = users.findIndex(u => u.puuid === perfil.puuid);
-    if (index !== -1) {
-      users[index] = perfil;
     } else {
-      users.push(perfil);
+      console.log('No he encontrado ninguna partida para ver, Redirijo la busqueda', puuid)
+      buscarJugadores(puuid, rangoMedio, puuidSemilla);
     }
-    }
+  } else {
+    console.log('EL JUGADOR QUE ESTABA BUSCANDO NO TIENE PARTIDAS', puuid)
+    buscarJugadores(puuidSemilla, rangoMedio, puuidSemilla);
+  }
 
-  })
- 
- 
-  // if (perfiles && perfiles.length) {
-  //   for (const perfil of perfiles) {
-  //     try {
-  //       const cantidadPartidas = perfil.wins + perfil.losses;
-
-  //       if (cantidadPartidas >= cantidadMinimaPartidas) {
-  //         const partidasJugador = await getPartidasJugador(perfil.puuid, cantidadPartidasMiradas);
-
-  //         if (partidasJugador && partidasJugador.length >= cantidadPartidasMiradas) {
-  //           const primeraPartida = await getDatosPartida(partidasJugador[0]);
-
-  //           if (primeraPartida?.info) {
-  //             const dentroRango = comprobarFechaPartidaValidaEnRango(
-  //               primeraPartida.info.gameStartTimestamp,
-  //               cantidadMinimaDias
-  //             );
-
-  //             if (dentroRango) {
-  //               const datosJugador = await getDatosJugador(perfil.puuid);
-  //               if (datosJugador) {
-  //                 const wr = cantidadPartidas > 0 ? (perfil.wins / cantidadPartidas) * 100 : 0;
-  //                 const nuevoUsuario = {
-  //                   puuid: perfil.puuid,
-  //                   nick: `${datosJugador.gameName}#${datosJugador.tagLine}`,
-  //                   fechaUltimaPartida: primeraPartida.info.gameEndTimestamp,
-  //                   fechaUltimaPartidaString: convertirMilisegundosAFecha(primeraPartida.info.gameStartTimestamp),
-  //                   tier: perfil.tier,
-  //                   rank: perfil.rank,
-  //                   cantidadPartidas,
-  //                   wins: perfil.wins,
-  //                   losses: perfil.losses,
-  //                   wr: parseFloat(wr.toFixed(2))
-  //                 };
-  //                 const index = users.findIndex(u => u.puuid === perfil.puuid);
-  //                 if (index !== -1) {
-  //                   users[index] = nuevoUsuario;
-  //                 } else {
-  //                   users.push(nuevoUsuario);
-  //                 }
-  //               }
-  //             }
-  //           }
-  //         }
-  //       }
-  //     } catch (error) {
-  //       console.error(`❌ Error procesando perfil ${perfil.puuid}:`, error);
-  //     }
-  //   }
-  // }
+  // const wr = cantidadPartidas > 0 ? (perfil.wins / cantidadPartidas) * 100 : 0;
+  // const nuevoUsuario = {
+  //   puuid: perfil.puuid,
+  //   nick: `${datosJugador.gameName}#${datosJugador.tagLine}`,
+  //   fechaUltimaPartida: primeraPartida.info.gameEndTimestamp,
+  //   fechaUltimaPartidaString: convertirMilisegundosAFecha(primeraPartida.info.gameStartTimestamp),
+  //   tier: perfil.tier,
+  //   rank: perfil.rank,
+  //   cantidadPartidas,
+  //   wins: perfil.wins,
+  //   losses: perfil.losses,
+  //   wr: parseFloat(wr.toFixed(2))
+  // };
 }
 
 
 async function getDatosJugador(puuid) {
+  // 20000 CADA 10 SEGUNDOS
   const url = `https://europe.api.riotgames.com/riot/account/v1/accounts/by-puuid/${puuid}?api_key=${api}`;
   try {
     const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response}`);
     const data = await response.json();
     return data;
   } catch (error) {
+    console.log(error)
     return [];
   }
 }
 
 async function getListadoPorRango(rango, minirango, page) {
+  // 50 CADA 10 SEGUNDOS // DEVUELVE 205 RESULTADOS POR PAGINA TOTAL 10.000 CADA 10 SEGUNDOS
   const url = `https://euw1.api.riotgames.com/lol/league-exp/v4/entries/RANKED_SOLO_5x5/${rango}/${minirango}?page=${page}&api_key=${api}`;
   try {
     const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response}`);
     const data = await response.json();
     return data;
   } catch (error) {
+    console.log(error)
     return [];
   }
 }
 
-async function getPartidasJugador(puuid, cantidadPartidasMiradas) {
-  const url = `https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=${cantidadPartidasMiradas}&queue=420&type=ranked&api_key=${api}`;
+async function getPartidasJugador(puuid) {
+  // 2000 CADA 10 SEGUNDOS
+  const url = `https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=100&queue=420&type=ranked&api_key=${api}`;
   try {
     const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response}`);
     const data = await response.json();
     return data;
   } catch (error) {
+    console.log(error)
     return [];
   }
 }
 
 
 async function getDatosPartida(idPartida) {
+  // 2000 CADA 10 SEGUNDOS
   const url = `https://europe.api.riotgames.com/lol/match/v5/matches/${idPartida}?api_key=${api}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response}`);
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.log(error)
+    return [];
+  }
+}
+
+async function getDatosJugadorPorNombre(nombreConTag) {
+  const url = `https://europe.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${nombreConTag.split('#')[0].trim()}/${nombreConTag.split('#')[1].trim()}?api_key=${api}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response}`);
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.log(error)
+    return [];
+  }
+}
+
+async function getDatosRankedJugadorPorPuuid(puuid) {
+  // 20.000 CADA 10 SEGUNDOS
+  const url = `https://euw1.api.riotgames.com/lol/league/v4/entries/by-puuid/${puuid}?api_key=${api}`;
   try {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const data = await response.json();
     return data;
   } catch (error) {
+    console.log(error)
     return [];
   }
 }
+
 
 
 
@@ -317,7 +352,7 @@ app.get("/", (req, res) => {
 
 app.get("/perfiles", async (req, res) => {
   try {
-    res.json(users);
+    res.json(usuariosGlobales);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error al obtener los perfiles" });
@@ -326,15 +361,15 @@ app.get("/perfiles", async (req, res) => {
 
 app.get("/perfilesFiltrados", async (req, res) => {
   try {
-    const { tier, rank } = req.query;
+    const { tier, rank, puntosRanked } = req.query;
 
     if (!tier || !rank) {
       return res.status(400).json({ error: "Faltan parámetros: tier y rank son obligatorios" });
     }
 
     // Filtrar los usuarios que cumplan las condiciones
-    const filtrados = users.filter(
-      (u) => u.tier?.toUpperCase() === tier.toUpperCase() && u.rank?.toUpperCase() === rank.toUpperCase()
+    const filtrados = usuariosGlobales.filter(
+      (u) => u.rankedSoloQ?.tier === tier && u.rankedSoloQ?.rank === rank
     );
 
     if (filtrados.length === 0) {
@@ -362,17 +397,15 @@ app.get("/perfilesFiltrados", async (req, res) => {
 
 app.listen(3000, async () => {
   console.log("Server listening on port 3000");
-  // for (let index = 0; index < divisiones.length; index= index +4) {
-  //   refrescarJugadores(index)
-  //   refrescarJugadores(index + 1)
-  //   refrescarJugadores(index + 2)
-  //   await refrescarJugadores(index + 3)
-  // }
-
-
-  while (true) {
-    await refrescarJugadores()
-  }
+  let res1 = await getDatosJugadorPorNombre("QUE PASA NENG#JAJA");
+  let puuid = res1.puuid;
+  console.log(res1)
+  buscarJugadores(puuid, 1, puuid)
+  buscarJugadores(puuid, 6, puuid)
+  buscarJugadores(puuid, 11, puuid)
+  buscarJugadores(puuid, 16, puuid)
+  buscarJugadores(puuid, 21, puuid)
+  buscarJugadores(puuid, 27, puuid)
 });
 
 
