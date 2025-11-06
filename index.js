@@ -172,7 +172,6 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
           let jugador = { nombre: participante2.riotIdGameName + '#' + participante2.riotIdTagline, puuid: participante2.puuid, dano: mediaDano, tiempo, puntosRanked }
           let flex = ranked.filter((ranked) => ranked?.queueType === 'RANKED_FLEX_SR')
           let rankedD = ranked.filter((ranked) => ranked?.queueType === 'RANKED_SOLO_5x5')
-          jugador.tier = rankedSo
           jugador.rankedSoloQ = rankedD.length ? rankedD[0] : null;
           jugador.rankedFlex = flex.length ? flex[0] : null;
           jugador.fechaPartida = convertirMilisegundosAFecha(res5.info.gameCreation);
