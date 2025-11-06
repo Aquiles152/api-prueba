@@ -393,7 +393,7 @@ app.get("/perfilesFiltrados", async (req, res) => {
 
 
 
-app.listen(3001, async () => {
+app.listen(3000, async () => {
   console.log("Server listening on port 3000");
   let res1 = await getDatosJugadorPorNombre("QUE PASA NENG#JAJA");
   let puuid = res1.puuid;
