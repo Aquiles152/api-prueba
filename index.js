@@ -367,7 +367,7 @@ app.get("/perfilesFiltrados", async (req, res) => {
 
     // Filtrar los usuarios que cumplan las condiciones
     const filtrados = usuariosGlobales.filter(
-      (u) => u.rankedSoloQ?.tier === tier && u.rankedSoloQ?.rank === rank
+      (u) => u.tierSQ === tier && u.rankSQ === rank
     );
 
     if (filtrados.length === 0) {
