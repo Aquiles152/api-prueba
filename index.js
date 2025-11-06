@@ -97,10 +97,10 @@ function escogerPartida(listaPartidas) {
   return siguientePartida || listaPartidas[0];
 }
 
-function calcularPuntosRanked(ranked) {
+function calcularPuntosRanked(tier, rank) {
   let puntos = 0;
-  if (ranked) {
-    switch (ranked.tier) {
+  if (tier && rank) {
+    switch (tier) {
       case 'IRON': puntos += 1; break;
       case 'BRONZE': puntos += 5; break;
       case 'SILVER': puntos += 9; break;
@@ -110,7 +110,7 @@ function calcularPuntosRanked(ranked) {
       case 'DIAMOND': puntos += 25; break;
       case 'MASTER': puntos += 29; break;
     }
-    switch (ranked.rank) {
+    switch (rank) {
       case 'IV': puntos += 0; break;
       case 'III': puntos += 1; break;
       case 'II': puntos += 2; break;
@@ -169,15 +169,14 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
           let mediaDano = (dano / tiempo);
           let flex = ranked.filter((ranked) => ranked?.queueType === 'RANKED_FLEX_SR')
           let rankedD = ranked.filter((ranked) => ranked?.queueType === 'RANKED_SOLO_5x5')
-          let puntosRanked = calcularPuntosRanked(rankedD?.length ? rankedD[0] : null);
-          let jugador = { 
-            nick: participante2.riotIdGameName + '#' + participante2.riotIdTagline, 
-            puuid: participante2.puuid, 
-            dmg: mediaDano.toFixed(1)
-          }
-
           let dataSoloQ = rankedD.length ? rankedD[0] : null;
           let dataFlex = flex.length ? flex[0] : null;
+
+          let jugador = {
+            nick: participante2.riotIdGameName + '#' + participante2.riotIdTagline,
+            puuid: participante2.puuid,
+            dmg: mediaDano.toFixed(1)
+          }
           jugador.date = res5.info.gameCreation;
           jugador.line = participante2.individualPosition
           jugador.champ = participante2.championName;
@@ -185,6 +184,8 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
             jugador.lps = dataSoloQ?.leaguePoints
             jugador.tierSQ = dataSoloQ.tier
             jugador.rankSQ = dataSoloQ.rank
+            jugador.wins = dataSoloQ.wins
+            jugador.losses = dataSoloQ.losses
             jugador.winrate = ((dataSoloQ.wins / (dataSoloQ.wins + dataSoloQ.losses)) * 100).toFixed(1);
             jugador.games = dataSoloQ.wins + dataSoloQ.losses;
           }
@@ -192,24 +193,27 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
             jugador.tierF = dataFlex.tier
             jugador.rankF = dataFlex.rank
           }
-          const index = usuariosGlobales.findIndex(u => u.puuid === jugador.puuid);
-          if (index !== -1) {
-            usuariosGlobales[index] = jugador;
-          } else {
-            usuariosGlobales.push(jugador);
-          }
 
+          if (tiempo > 400) {
+            const index = usuariosGlobales.findIndex(u => u.puuid === jugador.puuid);
+            if (index !== -1) {
+              usuariosGlobales[index] = jugador;
+            } else {
+              usuariosGlobales.push(jugador);
+            }
+          }
           let puntajeMedio = rangoMedio
+          console.log
+          let puntosRanked = calcularPuntosRanked(jugador.tierSQ, jugador.rankSQ);
           if (
-            (!siguienteJugador ||                                     // Si no hay jugador elegido aún
-              Math.abs(puntosRanked - puntajeMedio) <
-              Math.abs(siguienteJugador.puntosRanked - puntajeMedio)) &&
-            !jugadorExisteEnLista(participante2) &&                   // Evita repetidos
-            puntosRanked > 0                                          // Ignora jugadores sin rango válido
+            (!siguienteJugador.puuid ||
+              Math.abs(puntosRanked - puntajeMedio) < Math.abs(siguienteJugador.puntosRanked - puntajeMedio)) &&
+            !jugadorExisteEnLista(participante2) &&
+            puntosRanked > 0
           ) {
             siguienteJugador = {
               nombre: `${participante2.riotIdGameName}#${participante2.riotIdTagline}`,
-              puuid: participante2.puuid, 
+              puuid: participante2.puuid,
               dano: mediaDano,
               tiempo,
               puntosRanked
@@ -357,36 +361,95 @@ app.get("/perfiles", async (req, res) => {
   }
 });
 
-app.get("/perfilesFiltrados", async (req, res) => {
+// app.get("/perfilesFiltrados", async (req, res) => {
+//   try {
+//     const { tier, rank, puntosRanked } = req.query;
+
+//     if (!tier || !rank) {
+//       return res.status(400).json({ error: "Faltan parámetros: tier y rank son obligatorios" });
+//     }
+
+//     // Filtrar los usuarios que cumplan las condiciones
+//     const filtrados = usuariosGlobales.filter(
+//       (u) => u.tierSQ === tier && u.rankSQ === rank
+//     );
+
+//     if (filtrados.length === 0) {
+//       return res.status(404).json({ message: "No se encontraron usuarios con esos parámetros" });
+//     }
+
+//     // Mezclar aleatoriamente y devolver 50 (o menos si hay menos)
+//     const mezclados = filtrados.sort(() => Math.random() - 0.5).slice(0, 50);
+
+//     res.json({
+//       totalEncontrados: filtrados.length,
+//       devueltos: mezclados.length,
+//       tier,
+//       rank,
+//       perfiles: mezclados
+//     });
+//   } catch (err) {
+//     console.error("❌ Error en /perfiles:", err);
+//     res.status(500).json({ error: "Error al obtener los perfiles" });
+//   }
+// });
+
+
+
+// 📘 Endpoint principal
+app.get("/perfilesFiltrados", (req, res) => {
   try {
-    const { tier, rank, puntosRanked } = req.query;
+    // Extraer los parámetros de búsqueda
+    const {
+      wrLower, wrUpper,
+      nPartidasLower, nPartidasUpper,
+      rangoMinimo, rangoMaximo,
+      danoLower, danoUpper,
+      lvLower, lvUpper,
+      lpsLower, lpsUpper,
+      posicion,
+      diasMaximoBusqueda,
+      cantidadMaximaResultados
+    } = req.query;
 
-    if (!tier || !rank) {
-      return res.status(400).json({ error: "Faltan parámetros: tier y rank son obligatorios" });
-    }
+    console.log(req.query)
 
-    // Filtrar los usuarios que cumplan las condiciones
-    const filtrados = usuariosGlobales.filter(
-      (u) => u.tierSQ === tier && u.rankSQ === rank
-    );
+    // Calcular fecha mínima (días hacia atrás)
+    const diasMilis = parseInt(diasMaximoBusqueda) * 24 * 60 * 60 * 1000;
+    const fechaMinima = Date.now() - diasMilis;
 
-    if (filtrados.length === 0) {
-      return res.status(404).json({ message: "No se encontraron usuarios con esos parámetros" });
-    }
+    // 🔍 Filtrar usuarios según los parámetros recibidos
+    let filtrados = usuariosGlobales.filter(j => {
+      const wr = parseFloat(j.winrate || 0);
+      const games = parseInt(j.games || 0);
+      const dmg = parseFloat(j.dmg || 0);
+      const lps = parseInt(j.lps || 0);
+      const fechaPartida = parseInt(j.date || 0);
+      const tierValor = calcularPuntosRanked(j.tierSQ, j.rankSQ);
 
-    // Mezclar aleatoriamente y devolver 50 (o menos si hay menos)
-    const mezclados = filtrados.sort(() => Math.random() - 0.5).slice(0, 50);
-
-    res.json({
-      totalEncontrados: filtrados.length,
-      devueltos: mezclados.length,
-      tier,
-      rank,
-      perfiles: mezclados
+      return (
+        wr >= parseFloat(wrLower) && wr <= parseFloat(wrUpper)
+        && games >= parseInt(nPartidasLower) && games <= parseInt(nPartidasUpper)
+        && tierValor >= parseInt(rangoMinimo) && tierValor <= parseInt(rangoMaximo)
+        && dmg >= parseFloat(danoLower) && dmg <= parseFloat(danoUpper)
+        && lps >= parseInt(lpsLower) && lps <= parseInt(lpsUpper)
+        && (!posicion || j.line?.toUpperCase() === posicion.toUpperCase())
+        && (!j.date || fechaPartida >= fechaMinima)
+      );
     });
-  } catch (err) {
-    console.error("❌ Error en /perfiles:", err);
-    res.status(500).json({ error: "Error al obtener los perfiles" });
+
+    console.log(filtrados.length)
+
+    // Mezclar resultados aleatoriamente y limitar cantidad
+    filtrados = filtrados
+      .sort(() => Math.random() - 0.5)
+      .slice(0, parseInt(cantidadMaximaResultados) || 50);
+
+    res.json(filtrados);
+
+  } catch (error) {
+    console.error("Error filtrando perfiles:", error);
+    res.status(500).json({ error: "Error al filtrar los perfiles" });
   }
 });
 
