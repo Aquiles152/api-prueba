@@ -9,40 +9,37 @@ let users = [];
 let divisionesPublicas = null;
 
 
-let divisiones = [];
+let divisiones = [
+  ['IRON', 'IV', 1],
+  ['IRON', 'III', 1],
+  ['IRON', 'II', 1],
+  ['IRON', 'I', 1],
+  ['BRONZE', 'IV', 1],
+  ['BRONZE', 'III', 1],
+  ['BRONZE', 'II', 1],
+  ['BRONZE', 'I', 1],
+  ['SILVER', 'IV', 1],
+  ['SILVER', 'III', 1],
+  ['SILVER', 'II', 1],
+  ['SILVER', 'I', 1],
+  ['GOLD', 'IV', 1],
+  ['GOLD', 'III', 1],
+  ['GOLD', 'II', 1],
+  ['GOLD', 'I', 1],
+  ['PLATINUM', 'IV', 1],
+  ['PLATINUM', 'III', 1],
+  ['PLATINUM', 'II', 1],
+  ['PLATINUM', 'I', 1],
+  ['EMERALD', 'IV', 1],
+  ['EMERALD', 'III', 1],
+  ['EMERALD', 'II', 1],
+  ['EMERALD', 'I', 1],
+  ['DIAMOND', 'IV', 1],
+  ['DIAMOND', 'III', 1],
+  ['DIAMOND', 'II', 1],
+  ['DIAMOND', 'I', 1],
+];
 
-const resetearDivisiones = () => {
-  divisiones = [
-  ['IRON', 'IV', []],
-  ['IRON', 'III', []],
-  ['IRON', 'II', []],
-  ['IRON', 'I', []],
-  ['BRONZE', 'IV', []],
-  ['BRONZE', 'III', []],
-  ['BRONZE', 'II', []],
-  ['BRONZE', 'I', []],
-  ['SILVER', 'IV', []], 
-  ['SILVER', 'III', []],
-  ['SILVER', 'II', []],
-  ['SILVER', 'I', []],
-  ['GOLD', 'IV', []],
-  ['GOLD', 'III', []],
-  ['GOLD', 'II', []],
-  ['GOLD', 'I', []],
-  ['PLATINUM', 'IV', []],
-  ['PLATINUM', 'III', []],
-  ['PLATINUM', 'II', []],
-  ['PLATINUM', 'I', []],
-  ['EMERALD', 'IV', []],
-  ['EMERALD', 'III', []],
-  ['EMERALD', 'II', []],
-  ['EMERALD', 'I', []],
-  ['DIAMOND', 'IV', []],
-  ['DIAMOND', 'III', []],
-  ['DIAMOND', 'II', []],
-  ['DIAMOND', 'I', []],
-  ]
-}
 
 const sleep = (ms) => {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -77,80 +74,180 @@ const comprobarFechaPartidaValidaEnRango = (fechaPartidaNum, dias) => {
   return diferenciaTiempo <= MILISEGUNDOS_EN_UN_DIA;
 }
 
+
+
 // FILTROS
 const cantidadMinimaPartidas = 100;
 const cantidadPartidasMiradas = 3;
 const cantidadMinimaDias = 7; //SE PERMITE HOY + 1 DIA
 
-async function refrescarJugadores(contadoListaRefrescar) {
-  let terminado = false;
-  let contador = 1;
 
-  while (!terminado && contador < 50) {
-    const tier = divisiones[contadoListaRefrescar][0];
-    const rank = divisiones[contadoListaRefrescar][1];
+// 🔹 Ejecución tipo "forkJoin" con control de page
+async function obtenerPerfilesDeTodasLasDivisiones() {
+  const promesas = divisiones.map(async (division) => {
+    const [tier, rank, page] = division;
 
-    const perfiles = await getListadoPorRango(tier, rank, contador++);
+    try {
+      const perfiles = await getListadoPorRango(tier, rank, page);
+      if (perfiles && perfiles.length > 0) {
+        division[2] = page + 1;
 
-    if (perfiles && perfiles.length) {
-      console.log(tier, rank, contador, divisiones[contadoListaRefrescar][2].length);
+        let usuarios = []
 
-      // 👇 Usamos for...of en lugar de forEach para que los awaits funcionen bien
-      for (const perfil of perfiles) {
-        try {
-          const cantidadPartidas = perfil.wins + perfil.losses;
+        for (const perfil of perfiles) {
+          try {
+            const cantidadPartidas = perfil.wins + perfil.losses;
 
-          if (cantidadPartidas >= cantidadMinimaPartidas) {
-            const partidasJugador = await getPartidasJugador(perfil.puuid, cantidadPartidasMiradas);
+            if (cantidadPartidas >= cantidadMinimaPartidas) {
+              const partidasJugador = await getPartidasJugador(perfil.puuid, cantidadPartidasMiradas);
 
-            if (partidasJugador && partidasJugador.length >= cantidadPartidasMiradas) {
-              const primeraPartida = await getDatosPartida(partidasJugador[0]);
+              if (partidasJugador && partidasJugador.length >= cantidadPartidasMiradas) {
+                const primeraPartida = await getDatosPartida(partidasJugador[0]);
 
-              if (primeraPartida?.info) {
-                const dentroRango = comprobarFechaPartidaValidaEnRango(
-                  primeraPartida.info.gameStartTimestamp,
-                  cantidadMinimaDias
-                );
+                if (primeraPartida?.info) {
+                  const dentroRango = comprobarFechaPartidaValidaEnRango(
+                    primeraPartida.info.gameStartTimestamp,
+                    cantidadMinimaDias
+                  );
 
-                if (dentroRango) {
-                  const datosJugador = await getDatosJugador(perfil.puuid);
+                  if (dentroRango) {
+                    const datosJugador = await getDatosJugador(perfil.puuid);
+                    if (datosJugador) {
+                      const wr = cantidadPartidas > 0 ? (perfil.wins / cantidadPartidas) * 100 : 0;
+                      const nuevoUsuario = {
+                        puuid: perfil.puuid,
+                        nick: `${datosJugador.gameName}#${datosJugador.tagLine}`,
+                        fechaUltimaPartida: primeraPartida.info.gameEndTimestamp,
+                        fechaUltimaPartidaString: convertirMilisegundosAFecha(primeraPartida.info.gameStartTimestamp),
+                        tier: perfil.tier,
+                        rank: perfil.rank,
+                        cantidadPartidas,
+                        wins: perfil.wins,
+                        losses: perfil.losses,
+                        wr: parseFloat(wr.toFixed(2))
+                      };
+                      usuarios.push(nuevoUsuario)
 
-                  if (datosJugador) {
-                    const wr = cantidadPartidas > 0 ? (perfil.wins / cantidadPartidas) * 100 : 0;
-                    divisiones[contadoListaRefrescar][2].push({
-                      nick: `${datosJugador.gameName}#${datosJugador.tagLine}`,
-                      fechaUltimaPartida: primeraPartida.info.gameEndTimestamp,
-                      fechaUltimaPartidaString: convertirMilisegundosAFecha(
-                        primeraPartida.info.gameStartTimestamp
-                      ),
-                      tier: perfil.tier,
-                      rank: perfil.rank,
-                      cantidadPartidas,
-                      wins: perfil.wins,
-                      losses: perfil.losses,
-                      wr: parseFloat(wr.toFixed(2))
-                    });
+                    }
                   }
                 }
               }
             }
+          } catch (error) {
+            console.error(`❌ Error procesando perfil ${perfil.puuid}:`, error);
           }
-        } catch (error) {
-          console.error(`❌ Error procesando perfil ${perfil.puuid}:`, error);
         }
-      }
-    } else {
-      // No hay más páginas → pasamos al siguiente rango
-      // if (contadoListaRefrescar + 1 < divisiones.length) {
-      //   console.log(`➡️ Pasando a ${divisiones[contadoListaRefrescar + 1][0]} ${divisiones[contadoListaRefrescar + 1][1]}`);
-      //   await refrescarJugadores(contadoListaRefrescar + 1);
-      // } else {
-      //   console.log("✅ Todos los rangos completados");
-      // }
+        return usuarios
 
-      terminado = true;
+
+
+
+
+
+
+
+
+
+
+
+      } else {
+        division[2] = 1;
+      }
+
+    } catch (err) {
+      console.error(`❌ Error en ${tier} ${rank} página ${page}:`, err.message);
+      // reiniciamos para que vuelva a intentar desde la primera
+      division[2] = 1;
+      return [];
     }
-  }
+  });
+
+  const resultados = await Promise.all(promesas);
+  const todosLosPerfiles = resultados.flat();
+
+  console.log(`✅ Obtenidos ${todosLosPerfiles.length} perfiles`);
+  return todosLosPerfiles;
+}
+
+
+
+
+
+
+
+
+
+
+async function refrescarJugadores() {
+
+
+  // const tier = divisiones[contadoListaRefrescar][0];
+  // const rank = divisiones[contadoListaRefrescar][1];
+
+  // console.log(tier, rank, divisiones[contadoListaRefrescar][2], users.length);
+  // const perfiles = await getListadoPorRango(tier, rank, divisiones[contadoListaRefrescar][2]++);
+
+  let perfiles = await obtenerPerfilesDeTodasLasDivisiones()
+
+  perfiles.forEach(perfil => {
+    const index = users.findIndex(u => u.puuid === perfil.puuid);
+    if (index !== -1) {
+      users[index] = perfil;
+    } else {
+      users.push(perfil);
+    }
+  })
+ 
+ 
+  // if (perfiles && perfiles.length) {
+  //   for (const perfil of perfiles) {
+  //     try {
+  //       const cantidadPartidas = perfil.wins + perfil.losses;
+
+  //       if (cantidadPartidas >= cantidadMinimaPartidas) {
+  //         const partidasJugador = await getPartidasJugador(perfil.puuid, cantidadPartidasMiradas);
+
+  //         if (partidasJugador && partidasJugador.length >= cantidadPartidasMiradas) {
+  //           const primeraPartida = await getDatosPartida(partidasJugador[0]);
+
+  //           if (primeraPartida?.info) {
+  //             const dentroRango = comprobarFechaPartidaValidaEnRango(
+  //               primeraPartida.info.gameStartTimestamp,
+  //               cantidadMinimaDias
+  //             );
+
+  //             if (dentroRango) {
+  //               const datosJugador = await getDatosJugador(perfil.puuid);
+  //               if (datosJugador) {
+  //                 const wr = cantidadPartidas > 0 ? (perfil.wins / cantidadPartidas) * 100 : 0;
+  //                 const nuevoUsuario = {
+  //                   puuid: perfil.puuid,
+  //                   nick: `${datosJugador.gameName}#${datosJugador.tagLine}`,
+  //                   fechaUltimaPartida: primeraPartida.info.gameEndTimestamp,
+  //                   fechaUltimaPartidaString: convertirMilisegundosAFecha(primeraPartida.info.gameStartTimestamp),
+  //                   tier: perfil.tier,
+  //                   rank: perfil.rank,
+  //                   cantidadPartidas,
+  //                   wins: perfil.wins,
+  //                   losses: perfil.losses,
+  //                   wr: parseFloat(wr.toFixed(2))
+  //                 };
+  //                 const index = users.findIndex(u => u.puuid === perfil.puuid);
+  //                 if (index !== -1) {
+  //                   users[index] = nuevoUsuario;
+  //                 } else {
+  //                   users.push(nuevoUsuario);
+  //                 }
+  //               }
+  //             }
+  //           }
+  //         }
+  //       }
+  //     } catch (error) {
+  //       console.error(`❌ Error procesando perfil ${perfil.puuid}:`, error);
+  //     }
+  //   }
+  // }
 }
 
 
@@ -217,9 +314,42 @@ app.get("/", (req, res) => {
 
 app.get("/perfiles", async (req, res) => {
   try {
-    res.json({ divisionesPublicas: divisionesPublicas, divisiones: divisiones });
+    res.json(users);
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: "Error al obtener los perfiles" });
+  }
+});
+
+app.get("/perfilesFiltrados", async (req, res) => {
+  try {
+    const { tier, rank } = req.query;
+
+    if (!tier || !rank) {
+      return res.status(400).json({ error: "Faltan parámetros: tier y rank son obligatorios" });
+    }
+
+    // Filtrar los usuarios que cumplan las condiciones
+    const filtrados = users.filter(
+      (u) => u.tier?.toUpperCase() === tier.toUpperCase() && u.rank?.toUpperCase() === rank.toUpperCase()
+    );
+
+    if (filtrados.length === 0) {
+      return res.status(404).json({ message: "No se encontraron usuarios con esos parámetros" });
+    }
+
+    // Mezclar aleatoriamente y devolver 50 (o menos si hay menos)
+    const mezclados = filtrados.sort(() => Math.random() - 0.5).slice(0, 50);
+
+    res.json({
+      totalEncontrados: filtrados.length,
+      devueltos: mezclados.length,
+      tier,
+      rank,
+      perfiles: mezclados
+    });
+  } catch (err) {
+    console.error("❌ Error en /perfiles:", err);
     res.status(500).json({ error: "Error al obtener los perfiles" });
   }
 });
@@ -238,12 +368,7 @@ app.listen(3000, async () => {
 
 
   while (true) {
-    resetearDivisiones()
-    console.log("reseteado", divisiones.length)
-    for (let index = 0; index < divisiones.length; index++) {
-      await refrescarJugadores(index)
-    }
-    divisionesPublicas = divisiones
+    await refrescarJugadores()
   }
 });
 
