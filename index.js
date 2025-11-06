@@ -164,34 +164,33 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
         await sleep(200)
         const ranked = await getDatosRankedJugadorPorPuuid(participante2.puuid);
         if (ranked) {
-          let rankedT = ranked.filter((ranked) => ranked.queueType === 'RANKED_SOLO_5x5')
-          let puntosRanked = calcularPuntosRanked(rankedT.length ? rankedT[0] : null);
           let tiempo = participante2.timePlayed;
           let dano = (participante2.totalDamageDealtToChampions + participante2.totalHealsOnTeammates + participante2.totalDamageShieldedOnTeammates);
           let mediaDano = (dano / tiempo);
-          let jugador = { nombre: participante2.riotIdGameName + '#' + participante2.riotIdTagline, puuid: participante2.puuid, dano: mediaDano, tiempo, puntosRanked }
           let flex = ranked.filter((ranked) => ranked?.queueType === 'RANKED_FLEX_SR')
           let rankedD = ranked.filter((ranked) => ranked?.queueType === 'RANKED_SOLO_5x5')
-          jugador.rankedSoloQ = rankedD.length ? rankedD[0] : null;
-          jugador.rankedFlex = flex.length ? flex[0] : null;
-          jugador.fechaPartida = convertirMilisegundosAFecha(res5.info.gameCreation);
-          jugador.fechaPartidaNumero = res5.info.gameCreation;
-          jugador.lps = jugador.rankedSoloQ?.leaguePoints
-          jugador.agregado = false;
-          jugador.linea = participante2.individualPosition
-          jugador.lineaString = traductorLinea(participante2.individualPosition);
-          jugador.campeon = participante2.championName;
-          if (jugador.rankedSoloQ?.tier) {
-            jugador.rankedSoloQ.tier = jugador.rankedSoloQ.tier;
+          let puntosRanked = calcularPuntosRanked(rankedD?.length ? rankedD[0] : null);
+          let jugador = { 
+            nick: participante2.riotIdGameName + '#' + participante2.riotIdTagline, 
+            puuid: participante2.puuid, 
+            dmg: mediaDano.toFixed(1)
           }
 
-          if (jugador?.rankedSoloQ) {
-            jugador.winrate = (jugador.rankedSoloQ.wins / (jugador.rankedSoloQ.wins + jugador.rankedSoloQ.losses)) * 100;
-            jugador.cantidadPartidasJugadas = jugador.rankedSoloQ.wins + jugador.rankedSoloQ.losses;
-            jugador.rango = calcularPuntosRanked(jugador.rankedSoloQ);
+          let dataSoloQ = rankedD.length ? rankedD[0] : null;
+          let dataFlex = flex.length ? flex[0] : null;
+          jugador.date = res5.info.gameCreation;
+          jugador.line = participante2.individualPosition
+          jugador.champ = participante2.championName;
+          if (dataSoloQ) {
+            jugador.lps = dataSoloQ?.leaguePoints
+            jugador.tierSQ = dataSoloQ.tier
+            jugador.rankSQ = dataSoloQ.rank
+            jugador.winrate = ((dataSoloQ.wins / (dataSoloQ.wins + dataSoloQ.losses)) * 100).toFixed(1);
+            jugador.games = dataSoloQ.wins + dataSoloQ.losses;
           }
-          if (jugador.rankedFlex?.tier) {
-            jugador.rankedFlex.tier = traductorTierRanked(jugador.rankedFlex.tier);
+          if (dataFlex) {
+            jugador.tierF = dataFlex.tier
+            jugador.rankF = dataFlex.rank
           }
           const index = usuariosGlobales.findIndex(u => u.puuid === jugador.puuid);
           if (index !== -1) {
@@ -210,7 +209,7 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
           ) {
             siguienteJugador = {
               nombre: `${participante2.riotIdGameName}#${participante2.riotIdTagline}`,
-              puuid: participante2.puuid,
+              puuid: participante2.puuid, 
               dano: mediaDano,
               tiempo,
               puntosRanked
@@ -394,7 +393,7 @@ app.get("/perfilesFiltrados", async (req, res) => {
 
 
 
-app.listen(3000, async () => {
+app.listen(3001, async () => {
   console.log("Server listening on port 3000");
   let res1 = await getDatosJugadorPorNombre("QUE PASA NENG#JAJA");
   let puuid = res1.puuid;
