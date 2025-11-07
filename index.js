@@ -1,6 +1,32 @@
 import express from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
+import { MongoClient, ServerApiVersion } from "mongodb";
+
+
+const uri = "mongodb+srv://aquileslorca15_db_user:7gkU3EGtj7DgDrd2@bduserslol.yh28l1i.mongodb.net/?appName=lol_datos";
+let db
+// Create a MongoClient with a MongoClientOptions object to set the Stable API version
+const client = new MongoClient(uri, {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  }
+});
+
+async function run() {
+  try {
+    // Connect the client to the server	(optional starting in v4.7)
+    await client.connect();
+    // Send a ping to confirm a successful connection
+    db = await client.db("lol_datos");
+    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+  } finally {
+    // Ensures that the client will close when you finish/error
+    // await client.close();
+  }
+}
 
 
 let api = 'RGAPI-5511e4bb-2454-4751-b434-d26a521ea2f2';
@@ -153,7 +179,6 @@ const cantidadMinimaDias = 7; //SE PERMITE HOY + 1 DIA
 
 // 🔹 Ejecución tipo "forkJoin" con control de page
 async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
-  console.log("CANTIDAD TOTAL JUGADORES: ", usuariosGlobales.length)
   let siguienteJugador = { nombre: '', puuid: '', dano: 999999, tiempo: 0, puntosRanked: 999 }
   listaJugadores.push(puuid)
   let res4 = await getPartidasJugador(puuid)
@@ -188,8 +213,9 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
             jugador.rankSQ = dataSoloQ.rank
             jugador.wins = dataSoloQ.wins
             jugador.losses = dataSoloQ.losses
-            jugador.winrate = ((dataSoloQ.wins / (dataSoloQ.wins + dataSoloQ.losses)) * 100).toFixed(1);
+            jugador.winrate = parseFloat(((dataSoloQ.wins / (dataSoloQ.wins + dataSoloQ.losses)) * 100).toFixed(1));
             jugador.games = dataSoloQ.wins + dataSoloQ.losses;
+            jugador.valorSQ = calcularPuntosRanked(jugador.tierSQ, jugador.rankSQ);
           }
           if (dataFlex) {
             jugador.tierF = dataFlex.tier
@@ -197,15 +223,10 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
           }
 
           if (tiempo > 400) {
-            const index = usuariosGlobales.findIndex(u => u.puuid === jugador.puuid);
-            if (index !== -1) {
-              usuariosGlobales[index] = jugador;
-            } else {
-              usuariosGlobales.push(jugador);
-            }
+            guardarJugadorEnBD(jugador)
           }
           let puntajeMedio = rangoMedio
-          let puntosRanked = calcularPuntosRanked(jugador.tierSQ, jugador.rankSQ);
+          let puntosRanked = jugador.valorSQ
           if (
             (!siguienteJugador.puuid ||
               Math.abs(puntosRanked - puntajeMedio) < Math.abs(siguienteJugador.puntosRanked - puntajeMedio)) &&
@@ -340,6 +361,57 @@ async function getDatosRankedJugadorPorPuuid(puuid) {
   }
 }
 
+async function guardarJugadorEnBD(jugador) {
+  try {
+    // Buscar por PUUID y actualizar o insertar
+    const result = await db.collection("perfiles").updateOne(
+      { puuid: jugador.puuid },  // Filtro
+      { $set: jugador },         // Actualiza los campos con los nuevos datos
+      { upsert: true }           // Si no existe, lo crea
+    );
+
+    // if (result.upsertedCount > 0) {
+    //   console.log(`🆕 Nuevo jugador insertado: ${jugador.nick}`);
+    // } else {
+    //   console.log(`♻️ Jugador actualizado: ${jugador.nick}`);
+    // }
+  } catch (error) {
+    console.error("❌ Error al guardar jugador:", error);
+  }
+}
+
+
+// 🟢 CREATE
+async function crearPerfil(perfil) {
+  const result = await db.collection("perfiles").insertOne(perfil);
+  return result.insertedId;
+}
+
+// 🔵 READ (todos)
+async function obtenerPerfiles() {
+  return await db.collection("perfiles").find().toArray();
+}
+
+// 🔵 READ (por ID)
+async function obtenerPerfilPorId(id) {
+  return await db.collection("perfiles").findOne({ _id: new ObjectId(id) });
+}
+
+// 🟠 UPDATE
+async function actualizarPerfil(id, nuevosDatos) {
+  const result = await db.collection("perfiles").updateOne(
+    { _id: new ObjectId(id) },
+    { $set: nuevosDatos }
+  );
+  return result.modifiedCount > 0;
+}
+
+// 🔴 DELETE
+async function eliminarPerfil(id) {
+  const result = await db.collection("perfiles").deleteOne({ _id: new ObjectId(id) });
+  return result.deletedCount > 0;
+}
+
 
 
 
@@ -355,6 +427,7 @@ app.get("/", (req, res) => {
 
 app.get("/perfiles", async (req, res) => {
   try {
+    await crearPerfil({datos: "abc"})
     res.json(usuariosGlobales);
   } catch (err) {
     console.error(err);
@@ -362,45 +435,63 @@ app.get("/perfiles", async (req, res) => {
   }
 });
 
-// app.get("/perfilesFiltrados", async (req, res) => {
+
+// app.get("/perfilesFiltrados", (req, res) => {
 //   try {
-//     const { tier, rank, puntosRanked } = req.query;
+//     const {
+//       wrLower, wrUpper,
+//       nPartidasLower, nPartidasUpper,
+//       rangoMinimo, rangoMaximo,
+//       danoLower, danoUpper,
+//       lvLower, lvUpper,
+//       lpsLower, lpsUpper,
+//       posicion,
+//       diasMaximoBusqueda,
+//       cantidadMaximaResultados, campeonId
+//     } = req.query; 
 
-//     if (!tier || !rank) {
-//       return res.status(400).json({ error: "Faltan parámetros: tier y rank son obligatorios" });
-//     }
+//     const diasMilis = parseInt(diasMaximoBusqueda) * 24 * 60 * 60 * 1000;
+//     const fechaMinima = Date.now() - diasMilis;
 
-//     // Filtrar los usuarios que cumplan las condiciones
-//     const filtrados = usuariosGlobales.filter(
-//       (u) => u.tierSQ === tier && u.rankSQ === rank
-//     );
+//     let filtrados = usuariosGlobales.filter(j => {
+//       const wr = parseFloat(j.winrate || 0);
+//       const games = parseInt(j.games || 0);
+//       const dmg = parseFloat(j.dmg || 0);
+//       const lps = parseInt(j.lps || 0);
+//       const fechaPartida = parseInt(j.date || 0);
+//       const tierValor = calcularPuntosRanked(j.tierSQ, j.rankSQ);
 
-//     if (filtrados.length === 0) {
-//       return res.status(404).json({ message: "No se encontraron usuarios con esos parámetros" });
-//     }
-
-//     // Mezclar aleatoriamente y devolver 50 (o menos si hay menos)
-//     const mezclados = filtrados.sort(() => Math.random() - 0.5).slice(0, 50);
-
-//     res.json({
-//       totalEncontrados: filtrados.length,
-//       devueltos: mezclados.length,
-//       tier,
-//       rank,
-//       perfiles: mezclados
+//       return (
+//         wr >= parseFloat(wrLower) && wr <= parseFloat(wrUpper)
+//         && games >= parseInt(nPartidasLower) && games <= parseInt(nPartidasUpper)
+//         && tierValor >= parseInt(rangoMinimo) && tierValor <= parseInt(rangoMaximo)
+//         && dmg >= parseFloat(danoLower) && dmg <= parseFloat(danoUpper)
+//         && lps >= parseInt(lpsLower) && lps <= parseInt(lpsUpper)
+//         && (!posicion || j.line?.toUpperCase() === posicion.toUpperCase())
+//         && (!j.date || fechaPartida >= fechaMinima)
+//         && (!campeonId || parseInt(campeonId) === 0 || j.champId === parseInt(campeonId))
+//       );
 //     });
-//   } catch (err) {
-//     console.error("❌ Error en /perfiles:", err);
-//     res.status(500).json({ error: "Error al obtener los perfiles" });
+
+//     filtrados = filtrados
+//       .sort(() => Math.random() - 0.5)
+//       .slice(0, parseInt(cantidadMaximaResultados) || 50);
+
+//     res.json(filtrados);
+
+//   } catch (error) {
+//     console.error("Error filtrando perfiles:", error);
+//     res.status(500).json({ error: "Error al filtrar los perfiles" });
 //   }
 // });
 
 
+app.get("/perfilesFiltrados", async (req, res) => {
 
-// 📘 Endpoint principal
-app.get("/perfilesFiltrados", (req, res) => {
+  
+
+
   try {
-    // Extraer los parámetros de búsqueda
     const {
       wrLower, wrUpper,
       nPartidasLower, nPartidasUpper,
@@ -411,39 +502,40 @@ app.get("/perfilesFiltrados", (req, res) => {
       posicion,
       diasMaximoBusqueda,
       cantidadMaximaResultados, campeonId
-    } = req.query;
-    
-    // Calcular fecha mínima (días hacia atrás)
-    const diasMilis = parseInt(diasMaximoBusqueda) * 24 * 60 * 60 * 1000;
-    const fechaMinima = Date.now() - diasMilis;
+    } = req.query; 
 
-    // 🔍 Filtrar usuarios según los parámetros recibidos
-    let filtrados = usuariosGlobales.filter(j => {
-      const wr = parseFloat(j.winrate || 0);
-      const games = parseInt(j.games || 0);
-      const dmg = parseFloat(j.dmg || 0);
-      const lps = parseInt(j.lps || 0);
-      const fechaPartida = parseInt(j.date || 0);
-      const tierValor = calcularPuntosRanked(j.tierSQ, j.rankSQ);
+    console.log(req.query)
 
-      return (
-        wr >= parseFloat(wrLower) && wr <= parseFloat(wrUpper)
-        && games >= parseInt(nPartidasLower) && games <= parseInt(nPartidasUpper)
-        && tierValor >= parseInt(rangoMinimo) && tierValor <= parseInt(rangoMaximo)
-        && dmg >= parseFloat(danoLower) && dmg <= parseFloat(danoUpper)
-        && lps >= parseInt(lpsLower) && lps <= parseInt(lpsUpper)
-        && (!posicion || j.line?.toUpperCase() === posicion.toUpperCase())
-        && (!j.date || fechaPartida >= fechaMinima)
-        && (!campeonId || parseInt(campeonId) === 0 || j.champId === parseInt(campeonId))
-      );
-    });
+  const fechaMinima = Date.now() - diasMaximoBusqueda * 24 * 60 * 60 * 1000;
 
-    // Mezclar resultados aleatoriamente y limitar cantidad
-    filtrados = filtrados
+  // 🔍 Filtros MongoDB directos
+  const match = {
+    winrate: { $gte: parseFloat(wrLower), $lte: parseFloat(wrUpper) },
+    games: { $gte: parseInt(nPartidasLower), $lte: parseInt(nPartidasUpper) },
+    lps: { $gte: parseInt(lpsLower), $lte: parseInt(lpsUpper) },
+    valorSQ: { $gte: parseInt(rangoMinimo), $lte: parseInt(rangoMaximo) },
+    date: { $gte: fechaMinima },
+  };
+
+  if (posicion) match["line"] = posicion.toUpperCase();
+  if (campeonId && parseInt(campeonId) !== 0) match["champId"] = parseInt(campeonId);
+
+  // 🔹 Traer máximo 1000 desde BD para no sobrecargar
+  const candidatos = await db
+    .collection("perfiles")
+    .find(match)
+    .limit(1000)
+    .toArray();
+
+  // 🔹 Si hay más de 50, elegimos aleatoriamente
+  let seleccionados = candidatos;
+  if (candidatos.length > cantidadMaximaResultados) {
+    seleccionados = candidatos
       .sort(() => Math.random() - 0.5)
-      .slice(0, parseInt(cantidadMaximaResultados) || 50);
+      .slice(0, cantidadMaximaResultados);
+  }
 
-    res.json(filtrados);
+       res.json(seleccionados);
 
   } catch (error) {
     console.error("Error filtrando perfiles:", error);
@@ -454,11 +546,12 @@ app.get("/perfilesFiltrados", (req, res) => {
 
 
 
-app.listen(3000, async () => {
+app.listen(3001, async () => {
   console.log("Server listening on port 3000");
   let res1 = await getDatosJugadorPorNombre("QUE PASA NENG#JAJA");
   let puuid = res1.puuid;
   console.log(res1)
+  run().catch(console.dir);
   buscarJugadores(puuid, 1, puuid)
   buscarJugadores(puuid, 6, puuid)
   buscarJugadores(puuid, 11, puuid)
