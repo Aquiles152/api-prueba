@@ -11,6 +11,7 @@ const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
+    tlsAllowInvalidCertificates: true, // 👈 clave para Railway + Atlas
     deprecationErrors: true,
   }
 });
@@ -224,7 +225,7 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
           }
 
           if (tiempo > 400) {
-            guardarJugadorEnBD(jugador)
+            // guardarJugadorEnBD(jugador)
           }
           let puntajeMedio = rangoMedio
           let puntosRanked = jugador.valorSQ
