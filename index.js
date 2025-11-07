@@ -22,7 +22,8 @@ async function run() {
     // Send a ping to confirm a successful connection
     db = await client.db("lol_datos");
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
-  } finally {
+  } catch(error) {
+    console.log("Error al iniciar la bd", error)
     // Ensures that the client will close when you finish/error
     // await client.close();
   }
@@ -223,7 +224,7 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
           }
 
           if (tiempo > 400) {
-            guardarJugadorEnBD(jugador)
+            // guardarJugadorEnBD(jugador)
           }
           let puntajeMedio = rangoMedio
           let puntosRanked = jugador.valorSQ
@@ -551,7 +552,7 @@ app.listen(3001, async () => {
   let res1 = await getDatosJugadorPorNombre("QUE PASA NENG#JAJA");
   let puuid = res1.puuid;
   console.log(res1)
-  run().catch(console.dir);
+  await run().catch(console.dir);
   buscarJugadores(puuid, 1, puuid)
   buscarJugadores(puuid, 6, puuid)
   buscarJugadores(puuid, 11, puuid)
