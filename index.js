@@ -4,7 +4,7 @@ import cors from "cors";
 import { MongoClient, ServerApiVersion } from "mongodb";
 
 
-const uri = "mongodb+srv://aquileslorca15_db_user:7gkU3EGtj7DgDrd2@bduserslol.yh28l1i.mongodb.net/?appName=lol_datos";
+const uri = "mongodb+srv://aquileslorca15_db_user:7gkU3EGtj7DgDrd2@bduserslol.yh28l1i.mongodb.net/?appName=lol_datos?retryWrites=true&w=majority&tls=true";
 let db
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
