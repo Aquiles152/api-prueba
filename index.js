@@ -23,7 +23,7 @@ async function run() {
     // Send a ping to confirm a successful connection
     db = await client.db("lol_datos");
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
-  } catch(error) {
+  } catch (error) {
     console.log("Error al iniciar la bd", error)
     // Ensures that the client will close when you finish/error
     // await client.close();
@@ -429,7 +429,7 @@ app.get("/", (req, res) => {
 
 app.get("/perfiles", async (req, res) => {
   try {
-    await crearPerfil({datos: "abc"})
+    await crearPerfil({ datos: "abc" })
     res.json(usuariosGlobales);
   } catch (err) {
     console.error(err);
@@ -490,9 +490,6 @@ app.get("/perfiles", async (req, res) => {
 
 app.get("/perfilesFiltrados", async (req, res) => {
 
-  
-
-
   try {
     const {
       wrLower, wrUpper,
@@ -504,40 +501,44 @@ app.get("/perfilesFiltrados", async (req, res) => {
       posicion,
       diasMaximoBusqueda,
       cantidadMaximaResultados, campeonId
-    } = req.query; 
+    } = req.query;
 
     console.log(req.query)
 
-  const fechaMinima = Date.now() - diasMaximoBusqueda * 24 * 60 * 60 * 1000;
+    const fechaMinima = Date.now() - diasMaximoBusqueda * 24 * 60 * 60 * 1000;
 
-  // 🔍 Filtros MongoDB directos
-  const match = {
-    winrate: { $gte: parseFloat(wrLower), $lte: parseFloat(wrUpper) },
-    games: { $gte: parseInt(nPartidasLower), $lte: parseInt(nPartidasUpper) },
-    lps: { $gte: parseInt(lpsLower), $lte: parseInt(lpsUpper) },
-    valorSQ: { $gte: parseInt(rangoMinimo), $lte: parseInt(rangoMaximo) },
-    date: { $gte: fechaMinima },
-  };
+    // 🔍 Filtros MongoDB directos
+    const match = {
+      winrate: { $gte: parseFloat(wrLower), $lte: parseFloat(wrUpper) },
+      games: { $gte: parseInt(nPartidasLower), $lte: parseInt(nPartidasUpper) },
+      lps: { $gte: parseInt(lpsLower), $lte: parseInt(lpsUpper) },
+      valorSQ: { $gte: parseInt(rangoMinimo), $lte: parseInt(rangoMaximo) },
+      date: { $gte: fechaMinima },
+    };
 
-  if (posicion) match["line"] = posicion.toUpperCase();
-  if (campeonId && parseInt(campeonId) !== 0) match["champId"] = parseInt(campeonId);
+    if (posicion) match["line"] = posicion.toUpperCase();
+    if (campeonId && parseInt(campeonId) !== 0) match["champId"] = parseInt(campeonId);
 
-  // 🔹 Traer máximo 1000 desde BD para no sobrecargar
-  const candidatos = await db
-    .collection("perfiles")
-    .find(match)
-    .limit(1000)
-    .toArray();
+    if (!db) {
+      await run().catch(console.dir);
+    }
 
-  // 🔹 Si hay más de 50, elegimos aleatoriamente
-  let seleccionados = candidatos;
-  if (candidatos.length > cantidadMaximaResultados) {
-    seleccionados = candidatos
-      .sort(() => Math.random() - 0.5)
-      .slice(0, cantidadMaximaResultados);
-  }
+    // 🔹 Traer máximo 1000 desde BD para no sobrecargar
+    const candidatos = await db
+      .collection("perfiles")
+      .find(match)
+      .limit(1000)
+      .toArray();
 
-       res.json(seleccionados);
+    // 🔹 Si hay más de 50, elegimos aleatoriamente
+    let seleccionados = candidatos;
+    if (candidatos.length > cantidadMaximaResultados) {
+      seleccionados = candidatos
+        .sort(() => Math.random() - 0.5)
+        .slice(0, cantidadMaximaResultados);
+    }
+
+    res.json(seleccionados);
 
   } catch (error) {
     console.error("Error filtrando perfiles:", error);
