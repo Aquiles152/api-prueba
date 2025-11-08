@@ -527,7 +527,7 @@ app.get("/perfilesFiltrados", async (req, res) => {
     const candidatos = await db
       .collection("perfiles")
       .find(match)
-      .sort({ fecha: -1 })
+      .sort({ date: -1 })
       .limit(15)
       .toArray();
 
