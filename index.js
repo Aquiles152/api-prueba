@@ -176,7 +176,7 @@ function traductorTierRanked(tier) {
 // FILTROS
 const cantidadMinimaPartidas = 50;
 const cantidadPartidasMiradas = 3;
-const cantidadMinimaDias = 7; //SE PERMITE HOY + 1 DIA
+const cantidadMinimaDias = 2; //SE PERMITE HOY + 1 DIA
 
 
 // 🔹 Ejecución tipo "forkJoin" con control de page
@@ -186,7 +186,7 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
   let res4 = await getPartidasJugador(puuid)
   if (res4) {
     let res5 = await getDatosPartida(escogerPartida(res4))
-    if (res5) {
+    if (res5 && res5.info) {
       for (const participante2 of res5.info.participants) {
         await sleep(200)
         const ranked = await getDatosRankedJugadorPorPuuid(participante2.puuid);
@@ -224,8 +224,8 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
             jugador.rankF = dataFlex.rank
           }
 
-          if (tiempo > 400) {
-            // guardarJugadorEnBD(jugador)
+          if (tiempo > 400 && comprobarFechaPartidaValidaEnRango(jugador.date, cantidadMinimaDias) && jugador.tierSQ) {
+            guardarJugadorEnBD(jugador)
           }
           let puntajeMedio = rangoMedio
           let puntosRanked = jugador.valorSQ
@@ -372,11 +372,11 @@ async function guardarJugadorEnBD(jugador) {
       { upsert: true }           // Si no existe, lo crea
     );
 
-    // if (result.upsertedCount > 0) {
-    //   console.log(`🆕 Nuevo jugador insertado: ${jugador.nick}`);
-    // } else {
-    //   console.log(`♻️ Jugador actualizado: ${jugador.nick}`);
-    // }
+    if (result.upsertedCount > 0) {
+      console.log(`🆕 Nuevo jugador insertado: ${jugador.nick} ${jugador.tierSQ} ${jugador.rankSQ}`);
+    } else {
+      console.log(`♻️ Jugador actualizado: ${jugador.nick} ${jugador.tierSQ} ${jugador.rankSQ}`);
+    }
   } catch (error) {
     console.error("❌ Error al guardar jugador:", error);
   }
@@ -527,7 +527,8 @@ app.get("/perfilesFiltrados", async (req, res) => {
     const candidatos = await db
       .collection("perfiles")
       .find(match)
-      .limit(1000)
+      .sort({ fecha: -1 })
+      .limit(15)
       .toArray();
 
     // 🔹 Si hay más de 50, elegimos aleatoriamente
@@ -561,6 +562,15 @@ app.listen(3001, async () => {
   buscarJugadores(puuid, 16, puuid)
   buscarJugadores(puuid, 21, puuid)
   buscarJugadores(puuid, 27, puuid)
+
+
+
+  // buscarJugadores(puuid, 1, puuid)
+  // buscarJugadores(puuid, 1, puuid)
+  // buscarJugadores(puuid, 1, puuid)
+  // buscarJugadores(puuid, 1, puuid)
+  // buscarJugadores(puuid, 1, puuid)
+  // buscarJugadores(puuid, 1, puuid)
 });
 
 
