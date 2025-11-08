@@ -528,7 +528,7 @@ app.get("/perfilesFiltrados", async (req, res) => {
       .collection("perfiles")
       .find(match)
       .sort({ date: -1 })
-      .limit(15)
+      .limit(1000)
       .toArray();
 
     // 🔹 Si hay más de 50, elegimos aleatoriamente
