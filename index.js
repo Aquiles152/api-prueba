@@ -204,7 +204,7 @@ async function buscarJugadores(puuid, rangoMedio, puuidSemilla) {
             puuid: participante2.puuid,
             dmg: mediaDano.toFixed(1)
           }
-          jugador.date = res5.info.gameCreation;
+          jugador.date = res5.info.gameEndTimestamp ?? res5.info.gameCreation;
           jugador.line = participante2.individualPosition
           jugador.champ = participante2.championName;
           jugador.champId = participante2.championId;
@@ -500,10 +500,13 @@ app.get("/perfilesFiltrados", async (req, res) => {
       lpsLower, lpsUpper,
       posicion,
       diasMaximoBusqueda,
-      cantidadMaximaResultados, campeonId
+      cantidadMaximaResultados, campeonId,
+      isLocal
     } = req.query;
 
-    console.log(req.query)
+    if (!isLocal) {
+      console.log(req.query)
+    }
 
     const fechaMinima = Date.now() - diasMaximoBusqueda * 24 * 60 * 60 * 1000;
 
